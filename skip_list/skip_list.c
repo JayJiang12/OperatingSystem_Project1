@@ -8,7 +8,9 @@
 #include<stdio.h>
 #include<string.h>
 #include<stdlib.h>
-//#include<linux/file.h>
+#include<errno.h>
+#include<linux/kernel.h>
+//#include<linux/syscalls.h>
 //#include<asm/file.h>
 
 // node for Queue
@@ -26,7 +28,8 @@ typedef struct queue{
   
 // node for the skiplist 
 typedef struct node{
-  unsigned int id; 
+  unsigned int id;
+  unsigned int protected;
   struct queue *msg; 
   
   struct node **next; 
@@ -54,6 +57,7 @@ typedef struct skiplist{
    prob parameter inverse of the probability that a node in the list
    will be promoted to have an additional pointer in it
  */
+
 long slmbx_init(unsigned int ptrs, unsigned int prob);
 
 long slmbx_shutdown(void);
@@ -106,91 +110,154 @@ unsigned int LIST_PROB; // probability that a node will be promoted
                                 //to having additional pointer in skiplist.
 
 int main(){
-  printf("start\n");
 
+  long rv;
+  
   // test slmb_init()
-   printf("\n*****slmbx_init()*****\n");
-  printf("enter prob other than 2, 4, 8, 16 - 3 times\n");
-  if(slmbx_init(10, 5) == 1)
-    printf("slmbx_int error\n");
-  if(slmbx_init(10, 3) == 1)
-    printf("slmbx_int error\n");
-  if(slmbx_init(14, 45) == 1)
-    printf("slmbx_int error\n");
+  printf("\n*****slmbx_init()*****\n");
+  
+  printf("\npass ptr = 0\n");
+  printf("%s \n",strerror(slmbx_init(0, 4)));
+  
+  printf("\nenter prob other than 2, 4, 8, 16 - 3 times\n");
+  printf("%s \n",strerror(slmbx_init(0, 5)));
+  printf("%s \n",strerror(slmbx_init(0, 8)));
+  printf("%s \n",strerror(slmbx_init(0, 0)));
 
-  printf("enter prob 2, 4, 8 or 16.\n");
-  if (slmbx_init(10, 2) == 0)
-    printf("end of slmbx_init.\n");
-
+  printf("\nenter prob 2, 4, 8 or 16.\n");
+  rv = slmbx_init(4, 2);
+  if(rv == 0)
+    printf("slmbx_init success\n");
+  else
+    printf("%s \n",strerror(rv));
+  
   //test slmb_create()
-   printf("\n*****slmbx_create*****\n");
-  printf("Insert:----------\n");
+  printf("\n*****slmbx_create*****\n");
+  printf("\nInsert:----------\n");
 
   unsigned int arr[] = {3, 6, 9, 11, 4, 1, 7};
   unsigned int i;
+  
   for (i = 0; i < sizeof(arr) / sizeof(arr[0]); i++){
- 
-    if(slmbx_create(arr[i], 0) == 0)
-      printf("%u, is added\n", arr[i]);
+    rv = slmbx_create(arr[i], 0);
+    if(rv == 0)
+      printf("%u is added\n", arr[i]);
     else{
-      printf("%u, is not added\n", arr[i]);
+      printf("%s \n",strerror(rv));
     }
   }
 
+  printf("\n");
   print();
   
-  printf("Insert: 55, 67, 44\n");
-  if(slmbx_create(55, 0) == 0)
-      printf("%u, is added\n", 55);
-  else
-      printf("%u, is not added\n",55);
-  if(slmbx_create(67, 0) == 0)
-      printf("%u, is added\n", 67);
-  else
-      printf("%u, is not added\n", 67);
-  if(slmbx_create(44, 0) == 0)
-      printf("%u, is added\n", 44);
-  else
-      printf("%u, is not added\n", 44); 
+  printf("\nInsert: 55, 67, 44\n");
+
+  rv = slmbx_create(55, 0);
   
-  printf("Insert duplicates 55, 44\n");
-  if(slmbx_create(55, 0) == 0)
-      printf("%u, is added\n", 55);
-  else
-      printf("%u, is not added\n", 55);
-  if(slmbx_create(44, 0) == 0)
-      printf("%u, is added\n", 44);
-  else
-      printf("%u, is not added\n", 44);
+  if(rv == 0)
+    printf("%u is added\n", 55);
+  else{
+    printf("%s \n",strerror(rv));
+  }
+
+  rv = slmbx_create(67, 0);
+  if(rv == 0)
+    printf("%u is added\n", 67);
+  else{
+    printf("%s \n",strerror(rv));
+  }
+
+  rv = slmbx_create(44, 0);
+  if(rv == 0)
+    printf("%u is added\n", 44);
+  else{
+    printf("%s \n",strerror(rv));
+  }
+
+  printf("\nInsert duplicates 55, 44\n");
+
+  rv = slmbx_create(55, 0);
+
+  if(rv == 0)
+    printf("%u is added\n", 55);
+  else{
+    printf("%s \n",strerror(rv));
+  }
   
+  rv = slmbx_create(44, 0);
+  if(rv == 0)
+    printf("%u is added\n", 44);
+  else{
+    printf("%s \n",strerror(rv));
+  }
+
+  printf("\n");
   print();
 
+  
   // testing slmbx_send
   printf("\n*****slmbx_send()*****\n");
   unsigned char *message[] = {"abcdefgh", "123456789", "fffddd", "Maryalnd"}; 
   
   printf("sent message abcdcfgh 123456789 fffddd maryland to id 44\n");
   int j;
-  for (j = 0; j < 4; j++) 
-    slmbx_send(44, message[j], 7);
-   
-  printf("message to other id\n");
-  slmbx_send(11, message[2], 6);
+  for (j = 0; j < 4; j++){ 
+    rv = slmbx_send(44, message[j], 7);
+    if(rv == 0)
+      printf("message send success\n");
+    else
+      printf("%s", strerror(rv));
+  }
+  
+  printf("\nmessage to other id\n");
+  rv = slmbx_send(11, message[2], 6);
+  if(rv == 0)
+      printf("message send success\n");
+  else
+      printf("%s", strerror(rv));
 
-  printf("invalid id\n");
-  slmbx_send(99, message[1], 7);
-    
+  printf("\ninvalid id\n");
+  rv = slmbx_send(99, message[1], 7);
+  if(rv == 0)
+      printf("message send success\n");
+   else
+      printf("%s", strerror(rv));
+
+  print();
 
   // testing slmbx_recv()
   printf("\n*****slmbx_recv()*****\n");
   unsigned char* userMessage = malloc(sizeof(char));
  
-  slmbx_recv(44, userMessage, 5);
-  slmbx_recv(44, userMessage, 5);
-  slmbx_recv(44, userMessage, 5);
-  slmbx_recv(44, userMessage, 5);
-  slmbx_recv(44, userMessage, 5);
-  
+  rv = slmbx_recv(44, userMessage, 5);
+  if(rv == 0)
+      printf("%s message received success\n", userMessage);
+   else
+      printf("%s", strerror(rv));
+
+  rv = slmbx_recv(44, userMessage, 5);
+  if(rv == 0)
+      printf("message received success\n");
+   else
+      printf("%s", strerror(rv));
+
+  rv = slmbx_recv(44, userMessage, 5);
+  if(rv == 0)
+      printf("message received success\n");
+   else
+      printf("%s", strerror(rv));
+
+  rv = slmbx_recv(44, userMessage, 5);
+  if(rv == 0)
+      printf("message received success\n");
+   else
+      printf("%s", strerror(rv));
+
+  rv = slmbx_recv(44, userMessage, 5);
+  if(rv == 0)
+      printf("message received success\n");
+   else
+      printf("%s", strerror(rv));
   
   // testing slmbx_length
   printf("\n*****slmbx_length()*****\n");
@@ -240,14 +307,16 @@ int main(){
  */
 long slmbx_init(unsigned int ptrs, unsigned int prob){
 
+  if( ptrs == 0){
+    return EINVAL;
+  }
   MAX_LEVEL = ptrs;
-  
+
   // create probability for additional pointer.
   if(prob == 2 || prob == 4 || prob == 8 || prob == 16)
     LIST_PROB = prob;
   else{
-    printf("Error! Wrong probability entered. Please enter 2, 4, 8 or 16.\n");
-    return 1;
+    return EINVAL;
   }
   
   LIST  = malloc(sizeof(skiplist));
@@ -258,8 +327,9 @@ long slmbx_init(unsigned int ptrs, unsigned int prob){
   header->next = malloc(sizeof(node));
 
   int i;
-  for(i = 0; i < MAX_LEVEL; i++)
+  for(i = 0; i < MAX_LEVEL; i++){
     header->next[i] = LIST->header;
+  }
 
   LIST->level = 1;
   LIST->size = 0;
@@ -275,17 +345,12 @@ long slmbx_shutdown(void){
 // create a new mailbox with given id
 long slmbx_create(unsigned int id, int protected){
   
-  if (id == 0 || id == powerOf(2, 32) - 1){
-    printf("Invalid id is entered\n");
-    return 1;
-  }
- 
-  if (protected == 0){
-    //    printf("everyone can access it\n");
-  }
-  else{
-    //  printf("only owner can access it\n");
-  }
+  if (id == 0 || id == powerOf(2, 32) - 1)
+    return EINVAL;
+
+  if(LIST == NULL)
+    return ENODEV;
+
   
   node *update[MAX_LEVEL + 1];
   node *x = LIST->header;
@@ -305,8 +370,7 @@ long slmbx_create(unsigned int id, int protected){
 
   // check if id is already there
   if(id == x->id){
-    printf("%u, duplicates id\n", id);
-    return 1;
+    return EEXIST;
   }
 
   // check if need to add new pointer
@@ -321,6 +385,7 @@ long slmbx_create(unsigned int id, int protected){
 
      x = malloc(sizeof(node));
      x -> id = id;
+     x -> protected = protected;
      x -> next = malloc(sizeof(node));
      
      for(i = 1; i <= level; i++){
@@ -353,7 +418,7 @@ long slmbx_destroy(unsigned int id){
      for(i = 1; i <= LIST->level; i++){
       if(update[i]->next[i] != x)
     	break;
-      update[i]->next[1] = x->next[i];
+      update[i]->next[i] = x->next[i];
      }
 
     
@@ -364,8 +429,7 @@ long slmbx_destroy(unsigned int id){
     return 0;
   }
   else{
-    printf("no id found in destroy\n");
-    return -1;
+    return ENOENT;
   }
 }
 
@@ -415,8 +479,7 @@ long slmbx_send(unsigned int id, const unsigned char *msg, unsigned int len){
     Qnode *ptr = malloc(sizeof(*ptr));
 
     if(ptr == NULL){
-      printf("malloc() failed\n");
-      return 1;
+      return ENOMEM;
     }
 
     if(sizeof(msg) >= len){
@@ -429,43 +492,33 @@ long slmbx_send(unsigned int id, const unsigned char *msg, unsigned int len){
        }
     }
     else{
-      printf("length input is greater than lenght of message\n"); 
+      return EINVAL;
     }
 
       
     ptr->next = NULL;
 
     if(x->next[1]->msg == NULL){
-      printf("Queue not initialized\n");
       free(ptr);
-      return 1;
+      return ENOENT;
     }
 
     else if(x->next[1]->msg->head == NULL && x->next[1]->msg-> tail == NULL){
       x->next[1]->msg->head = x->next[1]->msg->tail = ptr;
-      printf("First message added\n");
-      printf("Message in Queue: \n");
-      print_queue(x->next[1]->msg);
       return 0;
     }
     else if( x->next[1]->msg->head == NULL || x->next[1]->msg->tail == NULL){
-      printf("Something is wrong with queue\n");
       free(ptr);
-      return 1;
+      return ENOENT;
     }
     else{
       x->next[1]->msg->tail->next = ptr;
       x->next[1]->msg->tail = ptr;
-      printf("more message added\n");
-      printf("Message in Queue: \n");
-      print_queue(x->next[1]->msg);
       return 0;
     }
-    return 0;
   }
   else{
-    printf("no id find\n");
-    return 1;
+    return ENOENT;
   }
 }
 
@@ -487,18 +540,15 @@ long slmbx_recv(unsigned int id, unsigned char *msg, unsigned int len){
     Qnode *head = NULL;
 
     if(x->next[1]->msg == NULL){
-      printf("list is empty\n");
-      return 1;
+      return ENOENT;
     }
 
     else if(x->next[1]->msg->head == NULL && x->next[1]->msg-> tail == NULL){
-      printf("List is still empty\n");
-      return 1;
+      return ESRCH;
     }
     else if( x->next[1]->msg->head == NULL || x->next[1]->msg->tail == NULL){
-      printf("Something is wrong with queue\n");
       free(ptr);
-      return 1;
+      return ENOMEM;
     }
     else{
 
@@ -524,17 +574,18 @@ long slmbx_recv(unsigned int id, unsigned char *msg, unsigned int len){
       if(x->next[1]->msg->head == NULL)
 	x->next[1]->msg->tail = x->next[1]->msg->head;
 
-      printf("current in the queue\n");
+      /*
+      printf("\ncurrent in the queue\n");
       print_queue(x->next[1]->msg);
 
-      printf("message copied to user space\n");
+      printf("\nmessage copied to user space\n");
       
       unsigned q;
       printf("length: %u - message: ", size);
       for (q = 0; q < size; q++){
 	printf("%c", msg[q]);
       }
-      printf("\n------------------------\n");
+      */
       return 0;
     }
   }
@@ -597,7 +648,7 @@ long int powerOf(unsigned int x, unsigned int n){
 
 unsigned int find(unsigned int id){
   node *x = LIST->header;
-  int i;
+  unsigned int i;
 
   // going for top to down
   for(i = LIST->level; i >=1; i--){
@@ -611,6 +662,7 @@ unsigned int find(unsigned int id){
 }
 
 void print(){
+  /*
   node *x = LIST->header;
   printf("head-> ");
   while(x && x->next[1] != LIST->header){
@@ -618,7 +670,22 @@ void print(){
     x = x->next[1];
   }
   printf("TAIL\n");
-
+  */
+  printf("Skip List: \n");
+  unsigned int i;
+  
+  for(int i = 0; i <= LIST->level; i++){
+    node *x = LIST->header->next[i];
+    printf("level %u: \n", i);
+    while(x && x->next[1] != LIST->header){
+    printf("%u ", x->next[1]->id);
+    x = x->next[1];
+    printf("->");
+    print_queue(x->msg);
+    printf("\n");
+  }
+    printf("\n");
+  }
 }
 
 /*************************************************
@@ -628,11 +695,14 @@ void print(){
 void print_queue(queue *list){
   Qnode *ptr = NULL;
 
-  if(list){
+  if(list->head){
     for(ptr = list->head; ptr; ptr = ptr -> next){
       print_message(ptr);
     }
-   printf("----------------------\n");
+     printf("end of message");
+  }
+  else{
+    printf("no message in mailbox");
   }
 }
 
@@ -640,48 +710,14 @@ void print_message(Qnode *ptr){
   unsigned int len = sizeof(ptr);
   if(ptr){
     int i;
-    printf("Message is: ");
 
     for(i = 0; i < len; i++){
         printf("%c", ptr->data[i]);
     }
-	printf("\n");
+    printf(" -  ");
   }
-  else
+  else{
     printf("No message in this mailbox\n");
-}
-
-/*
-unsigned char* copyMessage(unsigned *char a,
-			    unsigned * int l){
-  unsigned char* b = malloc(sizeof(char));
-
-  unsigned int i;
-  for (i = 0; i < l; i++){
-    b[i] = a[i];
+    return;
   }
-  
-  return b; 
 }
-*/
-
- 
-/*
-unsigned int get_length(unsigned char * buffer){
-
-    int i, c;
-    i = 0;
-    do{
-        c = fgetc(stdin);
-        if(c == '\n' || c == '\0')
-            return i;
-        else {                                                  
-            buffer[i] = c;
-            i++;
-	}
-
-    }while(1);
-    
-    return i;                                         
-}
-*/
