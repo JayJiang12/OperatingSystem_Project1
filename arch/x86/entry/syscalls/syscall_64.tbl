@@ -339,6 +339,14 @@
 330	common	pkey_alloc		sys_pkey_alloc
 331	common	pkey_free		sys_pkey_free
 332	common	statx			sys_statx
+333	common	init			slmbx_init
+334	common	shutdown		slmbx_shutdown
+335	common	create			slmbx_create
+336	common	destroy			slmbx_destroy
+337	common	count			slmbx_count
+338	common	send			slmbx_send
+339	common	recv			slmbx_recv
+340	common	length			slmbx_length
 
 #
 # x32-specific system call numbers start at 512 to avoid cache impact

@@ -10,8 +10,6 @@
 #include<stdlib.h>
 #include<errno.h>
 #include<linux/kernel.h>
-//#include<linux/syscalls.h>
-//#include<asm/file.h>
 
 // node for Queue
 typedef struct Qnode{
@@ -206,7 +204,7 @@ int main(){
     if(rv == 0)
       printf("message send success\n");
     else
-      printf("%s", strerror(rv));
+      printf("%s\n", strerror(rv));
   }
   
   printf("\nmessage to other id\n");
@@ -214,14 +212,21 @@ int main(){
   if(rv == 0)
       printf("message send success\n");
   else
-      printf("%s", strerror(rv));
+      printf("%s\n", strerror(rv));
 
-  printf("\ninvalid id\n");
+  printf("\nsent message to invalid id\n");
   rv = slmbx_send(99, message[1], 7);
   if(rv == 0)
       printf("message send success\n");
    else
-      printf("%s", strerror(rv));
+      printf("%s\n", strerror(rv));
+
+  printf("\nsent 0 length message to id 3\n");
+  rv = slmbx_send(3, "", 1);
+  if(rv == 0)
+      printf("message send success\n");
+   else
+      printf("%s\n", strerror(rv));
 
   print();
 
@@ -233,65 +238,94 @@ int main(){
   if(rv == 0)
       printf("%s message received success\n", userMessage);
    else
-      printf("%s", strerror(rv));
+      printf("%s\n", strerror(rv));
 
   rv = slmbx_recv(44, userMessage, 5);
   if(rv == 0)
       printf("message received success\n");
    else
-      printf("%s", strerror(rv));
+      printf("%s\n", strerror(rv));
 
   rv = slmbx_recv(44, userMessage, 5);
   if(rv == 0)
       printf("message received success\n");
    else
-      printf("%s", strerror(rv));
+      printf("%s\n", strerror(rv));
 
   rv = slmbx_recv(44, userMessage, 5);
   if(rv == 0)
       printf("message received success\n");
    else
-      printf("%s", strerror(rv));
+      printf("%s\n", strerror(rv));
 
   rv = slmbx_recv(44, userMessage, 5);
   if(rv == 0)
       printf("message received success\n");
    else
-      printf("%s", strerror(rv));
+      printf("%s\n", strerror(rv));
+
+  print();
   
   // testing slmbx_length
   printf("\n*****slmbx_length()*****\n");
   
   unsigned char *m[] = {"CMSC441", "Project", "Computer",
 			      "Maryalnd", "Washington"}; 
-  int k;
-  for (k = 0; k < 4; k++) 
-    slmbx_send(7, m[k], 7);
-
-  printf("get length of message in id ");
   
-  printf("sent message abcdcfgh CMSC441 Project Computer\n");
+  printf("get length of message in id\n");
+  
+  printf("sent message CMSC441 Project Computer\n");
   printf("Maryalnd Washington d to id 7\n");
 
-  printf("lenght of first message is %u\n", slmbx_length(7));
-  
-  printf("call id 44: ");
-  slmbx_length(44);
+  int k;
+  for (k = 0; k < 5; k++) 
+    slmbx_send(7, m[k], 7);
 
-  printf("lenght of first message is %u\n", slmbx_length(11));
+  print();
 
+  rv = slmbx_length(7);
+  if(rv < 10)
+    printf("\nlenght of first message in 7 is %u\n", rv);
+  else
+     printf("%s\n", strerror(rv));
+
+  printf("\ncall id 44 where 44 is not there:\n");
+  rv = slmbx_length(44);
+  printf("%s\n", strerror(rv));
+
+  rv = slmbx_length(11);
+  printf("lenght of first message is %u\n", rv);
+
+  rv =slmbx_length(1);
+  printf("Error: %s\n", strerror(rv));
+
+  printf("**************************");
   printf("\n*****slmbx_count()*****\n");
-  printf("number of message in id 7: %u\n", slmbx_count(7)); 
+  printf("*************************\n");
+  
+  rv = slmbx_count(7);
+  printf("number of message in id 7: %u\n", rv);
 
+  printf("id 44 where no message \n");
+  rv = slmbx_count(44);
+  printf("Error: %s\n", strerror(rv));
+
+  printf("**************************");
   printf("\n*****slmbx_destroy*****\n");
+  printf("*************************\n");
+  
   print();
   printf("call id 7\n");
-  slmbx_destroy(7);
-  printf("call count in id 7\n");
-  slmbx_count(7);
-  print();
-  printf("\n*****slmbx_shutdown()*****\n");
+  printf("%s", strerror(slmbx_destroy(7)));
   
+  printf("call count in id 7\n");
+  printf("%s\n", strerror(slmbx_count(7)));
+  printf("%s\n", strerror(slmbx_length(7)));
+  print();
+
+  printf("\n*****slmbx_shutdown()*****\n");
+  printf("%s", strerror(slmbx_shutdown()));
+  //  print();
   
   printf("end\n");
 
@@ -338,6 +372,16 @@ long slmbx_init(unsigned int ptrs, unsigned int prob){
 }
 
 long slmbx_shutdown(void){
+
+  unsigned int i = 0;
+  
+  for(int i = 0; i <= LIST->level; i++){
+    node *x = LIST->header->next[i];
+    slmbx_destroy(x->id);
+  }
+
+  free(LIST);
+  
   return 0;
 }
 
@@ -422,7 +466,7 @@ long slmbx_destroy(unsigned int id){
      }
 
     
-     //free_node(x);
+     free_node(x);
 
     while(LIST->level > 1 && LIST->header->next[LIST->level] == LIST->header)
     LIST->level--;
@@ -437,7 +481,7 @@ long slmbx_destroy(unsigned int id){
 long slmbx_count(unsigned int id){
 
   node *x = LIST->header;
-  node *ptr = NULL;
+  Qnode *ptr = NULL;
   long count = 0;
  
   int i;
@@ -445,20 +489,20 @@ long slmbx_count(unsigned int id){
     while (x->next[i]->id < id)
       x = x->next[i];
   }
-  
-  if(x->next[1]->id == id){
-    if(x->next[1]->msg->head == NULL){
-      return 0;
+
+  x = x->next[1];
+  if(x->id == id){
+    if(x->msg->head == NULL){
+      return ESRCH;
     }
     else{
-      for(ptr = x->next[1]->msg->head; ptr; ptr = ptr->next)
+      for(ptr = x->msg->head; ptr; ptr = ptr->next)
 	count = count + 1;
     }
     return count;
   }
   else{
-    printf("%u id not found\n", id);
-    return -1;
+    return ENOENT;
   }
 }
   
@@ -472,11 +516,11 @@ long slmbx_send(unsigned int id, const unsigned char *msg, unsigned int len){
     while (x->next[i]->id < id)
       x = x->next[i];
   }
-  
+  // x = x->next[1];
   if(x->next[1]->id == id){
 
     // create a new queue pointer
-    Qnode *ptr = malloc(sizeof(*ptr));
+    Qnode *ptr = malloc(sizeof(Qnode));
 
     if(ptr == NULL){
       return ENOMEM;
@@ -531,68 +575,54 @@ long slmbx_recv(unsigned int id, unsigned char *msg, unsigned int len){
     while (x->next[i]->id < id)
       x = x->next[i];
   }
-  
-  if(x->next[1]->id == id){
 
-    
+  x = x->next[1];
+  if(x->id == id){
+
     // create a new queue pointer and Header
     Qnode *ptr = NULL;
     Qnode *head = NULL;
-
-    if(x->next[1]->msg == NULL){
+    
+    if(x->msg == NULL){
       return ENOENT;
     }
-
-    else if(x->next[1]->msg->head == NULL && x->next[1]->msg-> tail == NULL){
+    
+    else if(x->msg->head == NULL && x->msg-> tail == NULL){
       return ESRCH;
     }
-    else if( x->next[1]->msg->head == NULL || x->next[1]->msg->tail == NULL){
+    else if( x->msg->head == NULL || x->msg->tail == NULL){
       free(ptr);
       return ENOMEM;
     }
     else{
-
-      unsigned int size = 0;
-      if(x->next[1]->msg->head->length <= len){
-	for (i = 0; i < x->next[1]->msg->head->length; i++){
-	  msg[i] = x->next[1]->msg->head->data[i];
+  
+      // copy the message to the msg
+      if(x->msg->head->length <= len){
+	for (i = 0; i < x->msg->head->length; i++){
+	  msg[i] = x->msg->head->data[i];
 	}
-	size = x->next[1]->msg->head->length;
       }
       else{
  	for (i = 0; i < len; i++){
-	  msg[i] = x->next[1]->msg->head->data[i];
+	  msg[i] = x->msg->head->data[i];
 	}
-	size = len;
       }
       
-      head = x->next[1]->msg->head;
+      head = x->msg->head;
       ptr = head->next;
+      head->data = NULL;
+      head->length = 0;
       free(head);
-      x-> next[1]->msg->head = ptr;
+      x->msg->head = ptr;
 
-      if(x->next[1]->msg->head == NULL)
-	x->next[1]->msg->tail = x->next[1]->msg->head;
-
-      /*
-      printf("\ncurrent in the queue\n");
-      print_queue(x->next[1]->msg);
-
-      printf("\nmessage copied to user space\n");
-      
-      unsigned q;
-      printf("length: %u - message: ", size);
-      for (q = 0; q < size; q++){
-	printf("%c", msg[q]);
-      }
-      */
+      if(x->msg->head == NULL)
+	x->msg->tail = x->msg->head;
       return 0;
     }
   }
   else{
-    printf("%u id not found in recv\n", id);
+    return ENOENT;
   }
-  return 0;
 }
 
 long slmbx_length(unsigned int id){
@@ -604,19 +634,21 @@ long slmbx_length(unsigned int id){
     while (x->next[i]->id < id)
       x = x->next[i];
   }
-  
-  if(x->next[1]->id == id){
-    if(x->next[1]->msg->head == NULL){
-      printf("no message in this id\n");
-      return 1;
+
+  x = x->next[1];
+  if(x->id == id){
+    if(x->msg == NULL){
+      return ENOENT;
+    }
+    if(x->msg->head == NULL){
+      return ESRCH;
     }
     else
-      return x->next[1]->msg->head->length;
+      return x->msg->head->length;
   }
   else{
-    printf("%u id not found\n", id);
+    return ENOENT;
   }
-  return 0;
 }
 
 unsigned int rand_level(){
@@ -658,39 +690,38 @@ unsigned int find(unsigned int id){
   if(x->next[1]->id == id)
     return 0;
   else
-    return 1;  
+    return ENOENT;  
 }
+    
+/*************************************************
+ ***** This section function is for testing ******
+ *************************************************/
 
 void print(){
-  /*
-  node *x = LIST->header;
-  printf("head-> ");
-  while(x && x->next[1] != LIST->header){
-    printf("%u -> ", x->next[1]->id);
-    x = x->next[1];
-  }
-  printf("TAIL\n");
-  */
-  printf("Skip List: \n");
-  unsigned int i;
+
+  if(LIST && LIST->header){
+
+    printf("Skip List: \n");
+    unsigned int i = 0;
   
-  for(int i = 0; i <= LIST->level; i++){
-    node *x = LIST->header->next[i];
+  // for(int i = 0; i <= LIST->level; i++){
+  //  node *x = LIST->header->next[i];
+  node *x = LIST->header;
     printf("level %u: \n", i);
     while(x && x->next[1] != LIST->header){
     printf("%u ", x->next[1]->id);
     x = x->next[1];
     printf("->");
     print_queue(x->msg);
-    printf("\n");
+    //    printf("\n");
+    }
+    // printf("\n");
+    //    }
   }
-    printf("\n");
+  else{
+    printf("no mailbox system\n");
   }
 }
-
-/*************************************************
- ********** this section is for queue ************
- *************************************************/
 
 void print_queue(queue *list){
   Qnode *ptr = NULL;
@@ -699,10 +730,10 @@ void print_queue(queue *list){
     for(ptr = list->head; ptr; ptr = ptr -> next){
       print_message(ptr);
     }
-     printf("end of message");
+     printf("end of message\n");
   }
   else{
-    printf("no message in mailbox");
+    printf("no message in mailbox\n");
   }
 }
 
@@ -714,10 +745,6 @@ void print_message(Qnode *ptr){
     for(i = 0; i < len; i++){
         printf("%c", ptr->data[i]);
     }
-    printf(" -  ");
-  }
-  else{
-    printf("No message in this mailbox\n");
-    return;
+    printf(" - ");
   }
 }
