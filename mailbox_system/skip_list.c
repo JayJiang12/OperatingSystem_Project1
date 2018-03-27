@@ -10,6 +10,7 @@
 #include<stdlib.h>
 #include<errno.h>
 #include<linux/kernel.h>
+#include<sys/syscall.h>
 
 // node for Queue
 typedef struct Qnode{
@@ -28,8 +29,9 @@ typedef struct queue{
 typedef struct node{
   unsigned int id;
   unsigned int protected;
-  struct queue *msg; 
+  unsigned int userID;
   
+  struct queue *msg;   
   struct node **next; 
   
 }node;
@@ -341,9 +343,12 @@ int main(){
  */
 long slmbx_init(unsigned int ptrs, unsigned int prob){
 
-  if( ptrs == 0){
+  if(getuid() !=0)
+    return EPERM;
+  
+  if( ptrs == 0)
     return EINVAL;
-  }
+
   MAX_LEVEL = ptrs;
 
   // create probability for additional pointer.
@@ -373,6 +378,9 @@ long slmbx_init(unsigned int ptrs, unsigned int prob){
 
 long slmbx_shutdown(void){
 
+  if(getuid() !=0)
+    return EPERM;
+  
   unsigned int i = 0;
   
   for(int i = 0; i <= LIST->level; i++){
@@ -394,7 +402,6 @@ long slmbx_create(unsigned int id, int protected){
 
   if(LIST == NULL)
     return ENODEV;
-
   
   node *update[MAX_LEVEL + 1];
   node *x = LIST->header;
@@ -428,8 +435,9 @@ long slmbx_create(unsigned int id, int protected){
     }
 
      x = malloc(sizeof(node));
-     x -> id = id;
+     x -> id = id; 
      x -> protected = protected;
+     x -> userID = getuid();
      x -> next = malloc(sizeof(node));
      
      for(i = 1; i <= level; i++){
@@ -457,16 +465,28 @@ long slmbx_destroy(unsigned int id){
    }
 
   x = x->next[1];
+  
   if(x != NULL &&  x->id == id){
+
+    if( x -> protected == 0){
+      if( x -> userID != getuid())
+	return EPERM;
+    }
     
-     for(i = 1; i <= LIST->level; i++){
+    for(i = 1; i <= LIST->level; i++){
       if(update[i]->next[i] != x)
     	break;
       update[i]->next[i] = x->next[i];
      }
 
-    
-     free_node(x);
+    /*
+    while(x){
+      unsigned char * message = malloc(sizeof(char));
+      slmbx_recv(id, message, 0);
+      free(message);
+    }
+    */
+    free_node(x);
 
     while(LIST->level > 1 && LIST->header->next[LIST->level] == LIST->header)
     LIST->level--;
@@ -491,7 +511,14 @@ long slmbx_count(unsigned int id){
   }
 
   x = x->next[1];
+
   if(x->id == id){
+
+    if( x -> protected == 0){
+      if( x -> userID != getuid())
+	return EPERM;
+    }
+ 
     if(x->msg->head == NULL){
       return ESRCH;
     }
@@ -516,9 +543,14 @@ long slmbx_send(unsigned int id, const unsigned char *msg, unsigned int len){
     while (x->next[i]->id < id)
       x = x->next[i];
   }
-  // x = x->next[1];
-  if(x->next[1]->id == id){
+  x = x->next[1];
+  if(x->id == id){
 
+     if( x -> protected == 0){
+      if( x -> userID != getuid())
+	return EPERM;
+    }
+     
     // create a new queue pointer
     Qnode *ptr = malloc(sizeof(Qnode));
 
@@ -542,22 +574,22 @@ long slmbx_send(unsigned int id, const unsigned char *msg, unsigned int len){
       
     ptr->next = NULL;
 
-    if(x->next[1]->msg == NULL){
+    if(x->msg == NULL){
       free(ptr);
       return ENOENT;
     }
 
-    else if(x->next[1]->msg->head == NULL && x->next[1]->msg-> tail == NULL){
-      x->next[1]->msg->head = x->next[1]->msg->tail = ptr;
+    else if(x->msg->head == NULL && x->msg-> tail == NULL){
+      x->msg->head = x->msg->tail = ptr;
       return 0;
     }
-    else if( x->next[1]->msg->head == NULL || x->next[1]->msg->tail == NULL){
+    else if( x->msg->head == NULL || x->msg->tail == NULL){
       free(ptr);
       return ENOENT;
     }
     else{
-      x->next[1]->msg->tail->next = ptr;
-      x->next[1]->msg->tail = ptr;
+      x->msg->tail->next = ptr;
+      x->msg->tail = ptr;
       return 0;
     }
   }
@@ -579,6 +611,11 @@ long slmbx_recv(unsigned int id, unsigned char *msg, unsigned int len){
   x = x->next[1];
   if(x->id == id){
 
+    if( x -> protected == 0){
+      if( x -> userID != getuid())
+	return EPERM;
+    }
+     
     // create a new queue pointer and Header
     Qnode *ptr = NULL;
     Qnode *head = NULL;
@@ -637,6 +674,12 @@ long slmbx_length(unsigned int id){
 
   x = x->next[1];
   if(x->id == id){
+    
+    if( x -> protected == 0){
+      if( x -> userID != getuid())
+	return EPERM;
+    }
+     
     if(x->msg == NULL){
       return ENOENT;
     }
