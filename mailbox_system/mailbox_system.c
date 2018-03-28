@@ -83,8 +83,8 @@ asmlinkage long slmbx_init(unsigned int ptrs, unsigned int prob){
   /*
     if(getuid() != 0)
     return -EPERM;
-  */  
-
+  */
+  
   if( ptrs == 0)
     return -EINVAL;
 
