@@ -14,6 +14,8 @@
 #include<linux/types.h>
 #include<linux/uidgid.h>
 #include<linux/mutex.h>
+#include<linux/cred.h>
+#include<linux/printk.h>
 
 // node for Queue
 typedef struct Qnode{
@@ -49,6 +51,22 @@ typedef struct skiplist{
 
 }skiplist;
 
+asmlinkage long slmbx_init(unsigned int ptrs, unsigned int prob);
+
+asmlinkage long slmbx_shutdown(void);
+
+asmlinkage long slmbx_create(unsigned int id, int protected);
+
+asmlinkage long slmbx_destroy(unsigned int id);
+
+asmlinkage long slmbx_count(unsigned int id);
+
+asmlinkage long slmbx_send(unsigned int id, const unsigned char *msg, unsigned int len);
+
+asmlinkage long slmbx_recv(unsigned int id, unsigned char *msg, unsigned int len);
+
+asmlinkage long slmbx_length(unsigned int id);
+
 // get random number
 unsigned int rand_level(void);
 
@@ -57,7 +75,7 @@ void free_node(node *x);
 // x power of n
 long int powerOf(unsigned int x, unsigned int n);
 
-uid_t geteuid(void);
+//uid_t geteuid(void);
 uid_t getuid(void);
 
 // Global Variable
@@ -80,10 +98,10 @@ asmlinkage long slmbx_init(unsigned int ptrs, unsigned int prob){
  
   // code starting
 
-  /*
-    if(getuid() != 0)
+ 
+  if(current_uid().val != 0)
     return -EPERM;
-  */
+ 
   
   if( ptrs == 0)
     return -EINVAL;
@@ -97,18 +115,18 @@ asmlinkage long slmbx_init(unsigned int ptrs, unsigned int prob){
     return -EINVAL;
   }
   
-  LIST  = kmalloc(sizeof(skiplist), GFP_KERNEL);
+  LIST = kmalloc(sizeof(skiplist), GFP_KERNEL);
   
   header = kmalloc(sizeof(node), GFP_KERNEL);
   header->id = powerOf(2, 32) - 1;
   
   LIST->header = header;
-  header->next = kmalloc(sizeof(node), GFP_KERNEL);
+  header->next = kmalloc(sizeof(node*), GFP_KERNEL);
   
   for(i = 0; i < MAX_LEVEL; i++){
     header->next[i] = LIST->header;
   }
-
+  
   LIST->level = 1;
   LIST->size = 0;
   
@@ -118,10 +136,10 @@ asmlinkage long slmbx_init(unsigned int ptrs, unsigned int prob){
 asmlinkage long slmbx_shutdown(void){
 
   //unsigned int i;
-  /*
-  if(getuid() !=0)
+  
+  if(current_uid().val !=0)
     return -EPERM;
-  */
+
   /*
   for(i = 0; i <= LIST->level; i++){
     node *x = LIST->header->next[i];
@@ -148,26 +166,30 @@ asmlinkage long slmbx_create(unsigned int id, int protected){
   if(LIST == NULL)
     return -ENODEV;
 
+  printk("a\n");
   x = LIST->header;
-
+  printk("b\n");
   // update order of id
   // go through least from top to bottom
   for(i = LIST->level; i >= 1; i--){
+    printk("%u in for\n", i);
     while(x->next[i]->id < id){
       x = x->next[i];
+      printk("%u in while\n", i);
     }
+    
     update[i] = x;
   }
 
+   printk("c\n");
   x = x->next[1];
-
   // check if id is already there
   if(id == x->id){
     return -EEXIST;
   }
-  
   // check if need to add new pointer
   else{
+    printk("d\n");
     level = rand_level();
     if(level > LIST->level){
       for(i = LIST->level + 1; i<= level; i++){
@@ -175,23 +197,24 @@ asmlinkage long slmbx_create(unsigned int id, int protected){
       }
       LIST->level = level;
     }
-
-    x = kmalloc(sizeof(node), GFP_KERNEL);
+     printk("e\n");
+     x = kmalloc(sizeof(node), GFP_KERNEL);
      x -> id = id; 
      x -> protected = protected;
-     //     x -> userID = getuid();
+     x -> userID = current_uid().val;
      x -> next = kmalloc(sizeof(node), GFP_KERNEL);
-     
+      printk("f\n");
      for(i = 1; i <= level; i++){
        x->next[i] = update[i]->next[i];
        update[i]->next[i] = x;
-
-
        msg = kmalloc(sizeof(queue), GFP_KERNEL);
-     x -> msg = msg;
-     x -> msg -> head = x -> msg -> tail = NULL;
-    }		           
+       x -> msg = msg;
+       x -> msg -> head = NULL;
+       x -> msg -> tail = NULL;
+       //kfree(msg);
+    }
   }
+  printk("end\n");
   return 0;
 }
 
@@ -211,12 +234,12 @@ asmlinkage long slmbx_destroy(unsigned int id){
   
   if(x != NULL &&  x->id == id){
 
-    /*
-    if( x -> protected != 0){
-      if( x -> userID != getuid())
+   
+  if( x -> protected != 0){
+    if( x -> userID != current_uid().val)
 	return -EPERM;
     }
-    */
+    
 
     for(i = 1; i <= LIST->level; i++){
       if(update[i]->next[i] != x)
@@ -262,12 +285,12 @@ asmlinkage long slmbx_count(unsigned int id){
 
   if(x->id == id){
 
-    /*
+    
     if( x -> protected != 0){
-      if( x -> userID != getuid())
+      if( x -> userID != current_uid().val)
 	return -EPERM;
     }
-    */
+
  
     if(x->msg->head == NULL){
       return -ESRCH;
@@ -299,12 +322,12 @@ asmlinkage long slmbx_send(unsigned int id, const unsigned char *msg, unsigned i
   x = x->next[1];
   if(x->id == id){
 
-    /*
+    
      if( x -> protected != 0){
-      if( x -> userID != getuid())
+      if( x -> userID != current_uid().val)
 	return -EPERM;
     }
-    */
+   
      
     // create a new queue pointer
      ptr = kmalloc(sizeof(Qnode), GFP_KERNEL);
@@ -368,12 +391,12 @@ asmlinkage long slmbx_recv(unsigned int id, unsigned char *msg, unsigned int len
   x = x->next[1];
   if(x->id == id){
 
-    /*
+    
     if( x -> protected != 0){
-      if( x -> userID != getuid())
+      if( x -> userID != current_uid().val)
 	return -EPERM;
     }
-    */
+    
     
     // create a new queue pointer and Header
     ptr = NULL;
@@ -436,12 +459,12 @@ asmlinkage long slmbx_length(unsigned int id){
   x = x->next[1];
   if(x->id == id){
 
-    /*
+    
     if( x -> protected != 0){
-      if( x -> userID != getuid())
+      if( x -> userID != current_uid().val)
 	return -EPERM;
     }
-    */
+   
     
     if(x->msg == NULL){
       return -ENOENT;
@@ -464,8 +487,8 @@ unsigned int rand_level(void){
   level = 1;
   
   get_random_bytes(&i, sizeof(unsigned int));
-  i = 1%1000;
-  while(i  < 1000 / powerOf(LIST_PROB, level) && level < MAX_LEVEL){
+  i = i%10000;
+  while(i  < 10000 / powerOf(LIST_PROB, level) && level < MAX_LEVEL){
     level++;
   }
   return level;
@@ -487,7 +510,7 @@ long int powerOf(unsigned int x, unsigned int n){
   number = 1;
 
   for (i = 0; i < n; ++i)
-    number *= x;
+    number = number * x;
 
   return number;
  

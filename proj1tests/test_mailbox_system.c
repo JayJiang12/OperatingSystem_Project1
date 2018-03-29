@@ -95,7 +95,7 @@ int main(int argc, char *argv[]){
   
   // test slmb_init()
   printf("\n*****slmbx_init()*****\n");
-  
+    
   printf("\npass ptr = 0\n");
   printf("%s \n",strerror(-slmbx_init(0, 4)));
 
@@ -111,12 +111,14 @@ int main(int argc, char *argv[]){
   
   //test slmb_create()
   printf("\n*****slmbx_create*****\n");
+  
+
   printf("\nInsert: 3, 6, 9, 11, 4, 1, 7\n");
 
-  unsigned int arr[] = {3, 6, 9, 11, 4, 1, 7};
-  unsigned int i;
   
-  for (i = 0; i < sizeof(arr) / sizeof(arr[0]); i++){
+  unsigned int arr[7] = {3, 6, 9, 11, 4, 1, 7};
+  unsigned int i;
+  for (i = 0; i < 7; i++){
     rv = slmbx_create(arr[i], 0);
     if(rv == 0)
       printf("%u is added\n", arr[i]);
@@ -137,7 +139,7 @@ int main(int argc, char *argv[]){
   else{
     printf("%s \n",strerror(-rv));
   }
-
+  
   rv = slmbx_create(67, 0);
   if(rv == 0)
     printf("%u is added\n", 67);
@@ -152,6 +154,15 @@ int main(int argc, char *argv[]){
     printf("%s \n",strerror(-rv));
   }
 
+  printf("%s \n",strerror(-slmbx_create(41, 0)));
+  printf("%s \n",strerror(-slmbx_create(12, 0)));
+  printf("%s \n",strerror(-slmbx_create(78, 0)));
+  printf("%s \n",strerror(-slmbx_create(12, 0)));
+  printf("%s \n",strerror(-slmbx_create(76, 0)));
+  printf("%s \n",strerror(-slmbx_create(56, 0)));
+  
+  
+  
   printf("\nInsert duplicates 55, 44\n");
 
   rv = slmbx_create(55, 0);
@@ -169,7 +180,7 @@ int main(int argc, char *argv[]){
     printf("%s \n",strerror(-rv));
   }
   
-  printf("\n");
+  //  printf("\n");
   // print();
   /*
   

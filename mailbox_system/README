@@ -1,0 +1,10 @@
+In the skip_list there is a c file i write before try to turn c file into kernel. my kernel can be builded but something i froze the whole Linux system. becareful on where you run the test because it may froze your system too.
+
+all kernel file is in the mailbox_system 
+
+test file for c file have memory leak due to destroy function not been finished.
+
+test file is the all in main function.
+
+you might need to use su to make KDEB_P...
+
